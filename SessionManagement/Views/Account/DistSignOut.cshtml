@@ -1,0 +1,9 @@
+﻿@{
+    ViewBag.Title = "SignedOut";
+}
+
+<h2 id="message">You've been signed out elsewhere, bro.</h2>
+
+@*Sign in again, with the old page as the redirectUri.*@
+<p>@Html.ActionLink("Sign Back In.", "SignIn", "Account", new {redirectUri = ViewBag.RedirectUri} , null)</p>
+

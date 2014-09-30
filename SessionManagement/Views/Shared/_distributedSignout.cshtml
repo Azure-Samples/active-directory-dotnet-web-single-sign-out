@@ -1,0 +1,86 @@
+﻿@if (Request.IsAuthenticated)
+{   
+    <script type="text/javascript">
+
+        if (window.self === window.top) {
+
+            // Check Session Endpoint sourced from the metadata document in startup.
+            var timerID;
+            var op_frame = document.createElement("iframe");
+            op_frame.setAttribute("src", "@SessionManagement.App_Start.OwinStartup.CheckSessionIFrame");
+            op_frame.setAttribute("hidden", "hidden");
+            document.body.appendChild(op_frame);
+            
+            // At interval, postMessage to iFrame with ClientId and OIDC Session State.
+            function check_session(sessionState, clientId, aadInstance) {
+                try {
+                    if (op_frame.contentWindow.location.protocol + "//" + op_frame.contentWindow.location.hostname == aadInstance) {
+                        var message = clientId + ' ' + sessionState;
+                        op_frame.contentWindow.postMessage(message, aadInstance);
+                    }
+                } catch (e) {
+                    var message = clientId + ' ' + sessionState;
+                    op_frame.contentWindow.postMessage(message, aadInstance);
+                }
+            }
+   
+            // If iFrame returns a message indicating a change in the session state, make an authorize request to AAD to check login status.
+            function rp_receiveMessage(e) {
+            
+                if (e.data == "changed") {
+                    clearInterval(timerID);            
+
+                    // Call into the app to construct the request url for us.
+                    $.ajax({
+                        type: "GET",
+                        dataType: "json",
+                        url: "/Account/SessionChanged"
+                    }).done(
+                    // a successfull return will send the request to the OP
+                    function (openIdConnectRequest) {
+                        op_frame.src = openIdConnectRequest;
+                    }).fail(
+                    function (e) {
+                        alert("Session check failed, might want to ask user to re-auth.");
+                    });
+                }
+            }
+
+            // Sets check_session to start polling
+            function setTimer(checkSessionFunction, sessionState, clientId, aadInstance) {
+                checkSessionFunction(sessionState, clientId, aadInstance);
+                timerID = setInterval(function () { checkSessionFunction(sessionState, clientId, aadInstance); }, 60000);
+            }
+
+            if (window.addEventListener) {
+                window.addEventListener("load", setTimer(check_session, "@SessionManagement.App_Start.OwinStartup.SessionState",
+                    "@SessionManagement.App_Start.OwinStartup.ClientId", "@SessionManagement.App_Start.OwinStartup.AADInstance"), false);
+                window.addEventListener("message", rp_receiveMessage, false);
+            }
+
+        } else if (window.location.pathname == "/Account/DistSignOut") {
+            // If we come to the DistSignOut page in the iframe, the user has been logged out. Redirect the browser to the same page.
+            try {
+                if (window.self !== window.top)
+                    window.parent.location.href = window.location.href + "?redirectUri=" + encodeURIComponent(window.parent.location.href);
+            } catch (e) {
+                window.top.location.href = window.location.href + "?redirectUri=" + encodeURIComponent(window.parent.location.href);
+            }
+
+        } else {
+
+            // If a page in the app is loaded in the iframe (& not DistSignOut page), restart the timer on the top window and point the iframe back to check session endpoint
+            window.top.timerID = window.top.setTimer(window.top.check_session, "@SessionManagement.App_Start.OwinStartup.SessionState",
+                "@SessionManagement.App_Start.OwinStartup.ClientId", "@SessionManagement.App_Start.OwinStartup.AADInstance");
+            window.top.op_frame.src = "@SessionManagement.App_Start.OwinStartup.CheckSessionIFrame";
+        }
+
+    </script>
+}
+
+@*//TODO: Need p3p header, not in IIS Express, for IE
+//TODO: Multi-User - Will work when id_token_hint is supported
+    TODO: Login_Required Prompt=None Returns HTTP 500, not 401*@
+    
+@*TODO: Run a full MT test
+TODO: Run a IE/IIS test with p3p headers*@
