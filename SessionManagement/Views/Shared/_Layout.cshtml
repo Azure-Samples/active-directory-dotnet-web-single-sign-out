@@ -8,8 +8,9 @@
     @Scripts.Render("~/bundles/modernizr")
 </head>
 <body>
-    
-    @{ Html.RenderPartial("_distributedSignout"); }
+
+    @*Need to include the SingleSignOut javascript on every page*@
+    @{ Html.RenderPartial("_SingleSignOut"); }
 
     <div class="navbar navbar-inverse navbar-fixed-top">
         <div class="container">

@@ -9,51 +9,64 @@ namespace SessionManagement.Controllers
 {
     public class AccountController : Controller
     {
+        // Action is used for constructing the OpenIDConnect request that the javascript
+        // will use to check if the user has been logged out of AAD.
         [Authorize]
-        public void SessionChanged()
+        public JsonResult SessionChanged()
         {
-            // issue a challenge so that OpenIdConnectHandler will be used to create the message
-            HttpContext.GetOwinContext().Authentication.Challenge(new AuthenticationProperties { RedirectUri = "/Account/SessionChanged" }, OpenIdConnectAuthenticationDefaults.AuthenticationType);
-            return;
+            // If the javascript made the reuest, issue a challenge so the OIDC request will be constructed.
+            if (HttpContext.GetOwinContext().Request.QueryString.Value == "")
+            {
+                HttpContext.GetOwinContext().Authentication.Challenge(
+                    new AuthenticationProperties { RedirectUri = "/Account/SessionChanged" },
+                    OpenIdConnectAuthenticationDefaults.AuthenticationType);
+                return Json(new { }, "application/json", JsonRequestBehavior.AllowGet);
+            }
+            else
+            {
+                // 'RedirectToIdentityProvider' redirects here with the OIDC request as the query string
+                return Json(HttpContext.GetOwinContext().Request.QueryString.Value, "application/json", JsonRequestBehavior.AllowGet);
+            }
         }
 
-        [Authorize]
-        public JsonResult SessionChangedCallback()
+        // Action for displaying a page notifying the user that they've been signed out automatically.
+        public ActionResult SingleSignOut(string redirectUri)
         {
-            // 'RedirectToIdentityProvider' redirects here with the OIDC authorize request
-            string redirectUrl =  HttpContext.GetOwinContext().Request.QueryString.Value;
-            return Json(redirectUrl, "application/json", JsonRequestBehavior.AllowGet);
-        }
-
-        public ActionResult DistSignOut(string redirectUri)
-        {
+            // RedirectUri is necessary to bring a user back to the same location 
+            // if they re-authenticate after a single sign out has occurred. 
             if (redirectUri == null)
                 ViewBag.RedirectUri = "https://localhost:44308/";
             else
                 ViewBag.RedirectUri = redirectUri;
 
-            // Sign the user out of the app, since they've already been signed out of AAD
+            // We need to sign the user out of the Application only,
+            // because they have already been logged out of AAD
             HttpContext.GetOwinContext().Authentication.SignOut(CookieAuthenticationDefaults.AuthenticationType);
             return View();
         }
 
-        // sign in triggered from the Sign In gesture in the UI or from link in Distributed Sign Out page.
+        // Sign in has been triggered from Sign In Button or From Single Sign Out Page.
         public void SignIn(string redirectUri)
         {
+            // RedirectUri is necessary to bring a user back to the same location 
+            // if they re-authenticate after a single sign out has occurred.
             if (redirectUri == null)
                 redirectUri = "/";
-
             if (!Request.IsAuthenticated)
             {
                 HttpContext.GetOwinContext().Authentication.Challenge(
-                    new AuthenticationProperties { RedirectUri = redirectUri }, OpenIdConnectAuthenticationDefaults.AuthenticationType);
+                    new AuthenticationProperties { RedirectUri = redirectUri },
+                    OpenIdConnectAuthenticationDefaults.AuthenticationType);
             }
         }
-        // sign out triggered from the Sign Out gesture in the UI, so sign out of app and AAD
+
+        // Sign a user out of both AAD and the Application
         public void SignOut()
         {
             HttpContext.GetOwinContext().Authentication.SignOut(
-                new AuthenticationProperties { RedirectUri = OwinStartup.PostLogoutRedirectUri }, OpenIdConnectAuthenticationDefaults.AuthenticationType, CookieAuthenticationDefaults.AuthenticationType);
+                new AuthenticationProperties { RedirectUri = OwinStartup.PostLogoutRedirectUri },
+                OpenIdConnectAuthenticationDefaults.AuthenticationType,
+                CookieAuthenticationDefaults.AuthenticationType);
         }
     }
 }

@@ -205,8 +205,8 @@
     <Content Include="Views\Home\Contact.cshtml" />
     <Content Include="Views\Home\Index.cshtml" />
     <Content Include="Views\Account\SessionChanged.cshtml" />
-    <Content Include="Views\Shared\_distributedSignout.cshtml" />
-    <Content Include="Views\Account\DistSignOut.cshtml" />
+    <Content Include="Views\Shared\_SingleSignOut.cshtml" />
+    <Content Include="Views\Account\SingleSignOut.cshtml" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="App_Data\" />

@@ -58,12 +58,6 @@ namespace SessionManagement.App_Start
             set;
         }
 
-        public static PropertiesDataFormat StateDataFormat
-        {
-            get;
-            set;
-        }
-
         public void ConfigureAuth(IAppBuilder app)
         {
             app.SetDefaultSignInAsAuthenticationType(CookieAuthenticationDefaults.AuthenticationType);
@@ -72,7 +66,9 @@ namespace SessionManagement.App_Start
                 new OpenIdConnectAuthenticationOptions
                 {
                     ClientId = clientId,
-                    MetadataAddress = aadInstance + tenant + "/.well-known/openid-configuration",
+                    PostLogoutRedirectUri = postLogoutRedirectUri,
+                    RedirectUri = redirectUri,
+                    Authority = aadInstance + tenant,
                     Notifications =
                         new OpenIdConnectAuthenticationNotifications
                         {
@@ -81,83 +77,94 @@ namespace SessionManagement.App_Start
                             RedirectToIdentityProvider = OwinStartup.RedirectToIdentityProvider,
                             SecurityTokenValidated = OwinStartup.SecurityTokenValidated,
                         },
-                    PostLogoutRedirectUri = postLogoutRedirectUri,
-                    RedirectUri = redirectUri,
                 });
-
-            var dataProtector = app.CreateDataProtector(typeof(OpenIdConnectAuthenticationMiddleware).FullName, OpenIdConnectAuthenticationDefaults.AuthenticationType, "v1");
-            StateDataFormat = new PropertiesDataFormat(dataProtector);
         }
 
         #region Notification hooks
-        public static Task AuthenticationFailed(AuthenticationFailedNotification<OpenIdConnectMessage, OpenIdConnectAuthenticationOptions> notification)
-        {
-            var index = notification.ProtocolMessage.State.IndexOf("=");
-            string cleaned = notification.ProtocolMessage.State.Substring(index + 1);
-            var unescaped = Uri.UnescapeDataString(cleaned);
-            var authProps = StateDataFormat.Unprotect(unescaped);
 
-            // TODO: A better way to know if prompt=none fail came as a result of session checking.
-            // If we received an OIDC message with a login_required error as a result of session change event, the user has logged out elsewhere.
-            if (notification.Exception.Message == "login_required" && authProps.RedirectUri.Contains("SessionChanged"))
+        public static Task RedirectToIdentityProvider(RedirectToIdentityProviderNotification<OpenIdConnectMessage, OpenIdConnectAuthenticationOptions> notification)
+        {
+            // If a challenge was issued by the SingleSignOut javascript
+            if (notification.Request.Path.Value == "/Account/SessionChanged")
             {
-                // Clear the OIDC session state so that we don't see any further "Session Changed" messages from the iframe.
-                SessionState = "";
-                notification.Response.Redirect("Account/DistSignOut");
+                // Store an app-specific cookie so we can identify OIDC messages that occurred
+                // as a result of the SingleSignOut javascript.
+                notification.Response.Cookies.Append("SingleSignOut" + clientId, notification.ProtocolMessage.State);
+
+                notification.ProtocolMessage.Prompt = "none";
+                string redirectUrl = notification.ProtocolMessage.BuildRedirectUrl();
+                notification.Response.Redirect("/Account/SessionChanged?" + notification.ProtocolMessage.BuildRedirectUrl());
                 notification.HandleResponse();
             }
 
             return Task.FromResult<object>(null);
         }
         
-        public static Task AuthorizationCodeRecieved(AuthorizationCodeReceivedNotification notification)
+        // We need to update these values each time we receive a new token, so the SingleSignOut
+        // javascript has access to the correct values.
+        public static Task SecurityTokenValidated(SecurityTokenValidatedNotification<OpenIdConnectMessage, OpenIdConnectAuthenticationOptions> notification)
         {
-            var index = notification.ProtocolMessage.State.IndexOf("=");
-            string cleaned = notification.ProtocolMessage.State.Substring(index + 1);
-            var unescaped = Uri.UnescapeDataString(cleaned);
-            var authProps = StateDataFormat.Unprotect(unescaped);
-
-            // TODO: a better way. See above.
-            // If we came from a check session request.
-            if (authProps.RedirectUri.Contains("SessionChanged")) 
-            {
-                // If we recieved an Authorization Code, and the accompanying id_token is not for the currently logged in user, a different user has been logged into the STS
-                if (notification.OwinContext.Authentication.User.Identity.IsAuthenticated && notification.AuthenticationTicket.Identity.Name != notification.OwinContext.Authentication.User.Identity.Name)
-                {
-                    // No need to clear the session state here. It has already been updated with the new user's value.
-                    notification.Response.Redirect("Account/DistSignOut");
-                    notification.HandleResponse();            
-                }
-                else if (notification.OwinContext.Authentication.User.Identity.IsAuthenticated && notification.AuthenticationTicket.Identity.Name == notification.OwinContext.Authentication.User.Identity.Name)
-                {
-                    notification.Response.Redirect("/");
-                    notification.HandleResponse();
-                }
-            
-            }
-            
+            CheckSessionIFrame = notification.AuthenticationTicket.Properties.Dictionary[Microsoft.IdentityModel.Protocols.OpenIdConnectSessionProperties.CheckSessionIFrame];
+            SessionState = notification.AuthenticationTicket.Properties.Dictionary[Microsoft.IdentityModel.Protocols.OpenIdConnectSessionProperties.SessionState];
             return Task.FromResult<object>(null);
         }
 
-        public static Task RedirectToIdentityProvider(RedirectToIdentityProviderNotification<OpenIdConnectMessage, OpenIdConnectAuthenticationOptions> notification)
+        // If the javascript issues an OIDC authorize request, and it fails (meaning the user needs to login)
+        // this notification will be triggered with the error message 'login_required'
+        public static Task AuthenticationFailed(AuthenticationFailedNotification<OpenIdConnectMessage, OpenIdConnectAuthenticationOptions> notification)
         {
-            if (notification.Request.Path.Value == "/Account/SessionChanged")
+            // If the failed authentication was a result of a request by the SingleSignOut javascript
+            if (notification.Request.Cookies["SingleSignOut" + clientId] != null 
+                && notification.Request.Cookies["SingleSignOut" + clientId].Contains(notification.ProtocolMessage.State) 
+                && notification.Exception.Message == "login_required")
             {
-                // If challenge resulted from the session changed event, add a prompt=none parameter.
-                notification.ProtocolMessage.Prompt = "none";
-                //notification.ProtocolMessage.State += "DistSignOut";
-                string redirectUrl = notification.ProtocolMessage.BuildRedirectUrl();
-                notification.Response.Redirect("/Account/SessionChangedCallback?" + notification.ProtocolMessage.BuildRedirectUrl());
+                // Clear the SingleSignOut cookie, and clear the OIDC session state so 
+                //that we don't see any further "Session Changed" messages from the iframe.
+                notification.Response.Cookies.Append("SingleSignOut" + clientId, "");
+                SessionState = "";
+                notification.Response.Redirect("Account/SingleSignOut");
                 notification.HandleResponse();
             }
 
             return Task.FromResult<object>(null);
         }
+        
+        // If the javascript issues an OIDC authorize reuest, and it succeeds, the user is already logged
+        // into AAD.  Since the AAD session cookie has changed, we need to check if the same use is still
+        // logged in.
+        public static Task AuthorizationCodeRecieved(AuthorizationCodeReceivedNotification notification)
+        {   
+            // If the successful authorize request was issued by the SingleSignOut javascript
+            if (notification.AuthenticationTicket.Properties.RedirectUri.Contains("SessionChanged")) 
+            {
+                // Clear the SingleSignOutCookie
+                notification.Response.Cookies.Append("SingleSignOut" + clientId, "");
 
-        public static Task SecurityTokenValidated(SecurityTokenValidatedNotification<OpenIdConnectMessage, OpenIdConnectAuthenticationOptions> notification)
-        {
-            CheckSessionIFrame = notification.AuthenticationTicket.Properties.Dictionary[Microsoft.IdentityModel.Protocols.OpenIdConnectSessionProperties.CheckSessionIFrame];
-            SessionState = notification.AuthenticationTicket.Properties.Dictionary[Microsoft.IdentityModel.Protocols.OpenIdConnectSessionProperties.SessionState];
+                Claim existingUserObjectId = notification.OwinContext.Authentication.User.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier");
+                Claim incomingUserObjectId = notification.AuthenticationTicket.Identity.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier");
+
+                if (existingUserObjectId.Value != null && incomingUserObjectId != null)
+                {   
+                    // If a different user is logged into AAD
+                    if(existingUserObjectId.Value != incomingUserObjectId.Value)
+                    {
+                        // No need to clear the session state here. It has already been
+                        // updated with the new user's session state in SecurityTokenValidated.
+                        notification.Response.Redirect("Account/SingleSignOut");
+                        notification.HandleResponse();            
+                    }
+                    // If the same user is logged into AAD
+                    else if (existingUserObjectId.Value == incomingUserObjectId.Value)
+                    {
+                        // No need to clear the session state, SecurityTokenValidated will do so.
+                        // Simply redirect the iframe to a page other than SingleSignOut to reset
+                        // the timer in the javascript.
+                        notification.Response.Redirect("/");
+                        notification.HandleResponse();
+                    }
+                }
+            }
+            
             return Task.FromResult<object>(null);
         }
         #endregion
