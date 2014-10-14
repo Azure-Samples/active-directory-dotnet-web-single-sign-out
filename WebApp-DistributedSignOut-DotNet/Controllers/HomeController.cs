@@ -1,6 +1,6 @@
 ﻿using System.Web.Mvc;
 
-namespace SessionManagement.Controllers
+namespace WebAppDistributedSignOutDotNet.Controllers
 {
     public class HomeController : Controller
     {
@@ -19,7 +19,6 @@ namespace SessionManagement.Controllers
         [Authorize]
         public ActionResult Contact()
         {
-            HttpContext.Response.AddHeader("p3p", "CP=\"IDC DSP COR ADM DEVi TAIi PSA PSD IVAi IVDi CONi HIS OUR IND CNT\"");
             ViewBag.Message = "Your contact page.";
             return View();
         }

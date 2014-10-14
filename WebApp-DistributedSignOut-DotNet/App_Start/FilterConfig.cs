@@ -1,7 +1,7 @@
 ﻿using System.Web;
 using System.Web.Mvc;
 
-namespace SessionManagement
+namespace WebAppDistributedSignOutDotNet
 {
     public class FilterConfig
     {

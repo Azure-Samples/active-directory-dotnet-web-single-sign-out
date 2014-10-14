@@ -3,9 +3,9 @@ using System.Threading.Tasks;
 using Microsoft.Owin;
 using Owin;
 
-[assembly: OwinStartup(typeof(SessionManagement.App_Start.OwinStartup))]
+[assembly: OwinStartup(typeof(WebAppDistributedSignOutDotNet.App_Start.OwinStartup))]
 
-namespace SessionManagement.App_Start
+namespace WebAppDistributedSignOutDotNet.App_Start
 {
     public partial class OwinStartup
     {

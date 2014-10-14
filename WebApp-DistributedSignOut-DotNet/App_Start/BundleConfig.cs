@@ -1,7 +1,7 @@
 ﻿using System.Web;
 using System.Web.Optimization;
 
-namespace SessionManagement
+namespace WebAppDistributedSignOutDotNet
 {
     public class BundleConfig
     {
