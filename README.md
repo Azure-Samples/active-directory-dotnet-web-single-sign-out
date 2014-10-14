@@ -59,3 +59,34 @@ If you already have a user account with Global Administrator rights in your Azur
 ### Step 5:  Run the sample
 
 Clean the solution, rebuild the solution, and run it.  NOTE: Be sure not to run the sample in Internet Explorer, or you will get unexpected behavior.  Sign into the application by clicking one of the tabs, such as "About."  Be sure to sign in with a user that can also sign in to the Azure Management Portal.  Once signed in, sign in to the [Azure Management Portal](https://manage.windowsazure.com) as well.  Try signing out of either application; you will be signed out of the other in a matter of seconds.
+
+
+## Code Walk-Through
+
+For the most part, you can simply cut and paste the code from this sample into your OWIN application in order to provide Single Sign Out functionality.  But for a deeper understanding of the code and the OpenID Connect Session Managment protocol, take a look at the following five files:
+
+####_Layout.cshtml
+
+In `_Layout.cshtml`, you simply need to render the _SingleSignOut.cshtml partial view, so that the Single Sign Out related javascript is loaded into every page in the application.
+
+####_SingleSignOut.cshtml
+
+This partial view is where the majority of the action takes place.  In order to know when to perform Single Sign Out, the application needs a way to check the status of the user's session with Azure AD.  This could be achieved by polling AAD periodically, but would incur more network cost than is necessary.  Instead, the application will periodically check the value of a cookie that is set by AAD on login, as directed by the OpenID Connect Session Management specfication.  Only if the value of the cookie has changed will the application then submit a request to AAD to check the status of the user's session with AAD.  AAD provides a "CheckSessionIframe" to peform this check for you that is used in this sample.
+
+When a page in the application loads, the javascript loads the CheckSessionIframe in a hidden iFrame.  On a periodic basis, it triggers the CheckSessionIFrame to check the AAD cookie and notify the application of any changes.  If a change in the AAD session has been detected, the iFrame is pointed to AAD's authorize endpoint, submitting an authorization request to AAD without requring user interaction (since the iFrame is hidden, of course). The result of this authorization request will be processed by the OWIN OpenIDConnect Middleware, described below in `Startup.Auth.cs`.
+
+####AccountController.cs
+
+In `AccountController.cs`, there are two actions to note.  The `SessionChanged` action is a shortcut that is used to construct the authorization request that is submitted to AAD.  The javascript submits an ajax request to this action, which subsequently issues an OpenID Connect challenge.  This challenge triggers OWIN to construct an authorization request and submit it to AAD.  But instead of allowing OWIN to submit the authorization request, the request is intercepted in `Startup.Auth.cs`'s `RedirectToIdentityProvider` notification and is returned to the originating javascript via `SessionChanged` as the result of the ajax request.  In this way, the javascript does not have to construct an authorization request on its own.
+
+The other action to note is `SingleSignOut`, which actually signs the user out of the application and displays a message telling the user that a Single Sign Out has occurred.
+
+####SingleSignOut.cshtml
+
+Presents the Single Sign Out occurred message to the user.
+
+####Startup.Auth.cs
+
+In `Startup.Auth.cs`, two `OpenIDConnectAuthenticationNotifications` callbacks are used to process the authorization request result from AAD.  If the request fails, it can be interpreted as the user needing to reauthenticate with AAD (and that the user should be signed out of the application).  OWIN triggers the `AuthenticationFailed` callback, which signs the user out using the `SingleSignOut` action.
+
+If the authorization request succeeds, there are two possibilities.  First, that the user is still authenticated with AAD and no Single Sign Out is necessary.  Second, that the user is authenticated with AAD but as a different user than before.  In this case, a Single Sign Out is necessary.  In either case, OWIN triggers the `AuthorizationCodeRecieved` callback, which handles each case individually.
