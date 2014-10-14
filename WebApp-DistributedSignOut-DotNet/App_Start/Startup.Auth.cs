@@ -15,10 +15,12 @@ using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
-namespace SessionManagement.App_Start
+namespace WebAppDistributedSignOutDotNet.App_Start
 {
     public partial class OwinStartup
     {
+        // These public properties are required to enable the partial views to access their values.
+
         private static string appKey = ConfigurationManager.AppSettings["ida:AppKey"];
         private static string aadInstance = ConfigurationManager.AppSettings["ida:AADInstance"];
         private static string clientId = ConfigurationManager.AppSettings["ida:ClientId"];

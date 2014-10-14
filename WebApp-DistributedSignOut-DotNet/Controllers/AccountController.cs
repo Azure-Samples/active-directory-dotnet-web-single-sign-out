@@ -1,11 +1,11 @@
 ﻿using Microsoft.Owin.Security;
 using Microsoft.Owin.Security.Cookies;
 using Microsoft.Owin.Security.OpenIdConnect;
-using SessionManagement.App_Start;
+using WebAppDistributedSignOutDotNet.App_Start;
 using System.Web;
 using System.Web.Mvc;
 
-namespace SessionManagement.Controllers
+namespace WebAppDistributedSignOutDotNet.Controllers
 {
     public class AccountController : Controller
     {

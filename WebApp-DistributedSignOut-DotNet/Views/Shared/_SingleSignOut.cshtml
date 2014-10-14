@@ -10,7 +10,7 @@
             // sourced from the CheckSessionIFrame endpoint.
             var timerID;
             var op_frame = document.createElement("iframe");
-            op_frame.setAttribute("src", "@SessionManagement.App_Start.OwinStartup.CheckSessionIFrame");
+            op_frame.setAttribute("src", "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.CheckSessionIFrame");
             op_frame.setAttribute("hidden", "hidden");
             document.body.appendChild(op_frame);
             
@@ -62,9 +62,9 @@
 
             if (window.addEventListener) {
                 window.addEventListener("load", setTimer(check_session,
-                    "@SessionManagement.App_Start.OwinStartup.SessionState",
-                    "@SessionManagement.App_Start.OwinStartup.ClientId",
-                    "@SessionManagement.App_Start.OwinStartup.AADInstance"), false);
+                    "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.SessionState",
+                    "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.ClientId",
+                    "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.AADInstance"), false);
                 window.addEventListener("message", rp_receiveMessage, false);
             }
 
@@ -84,9 +84,9 @@
             // If a page in the app is loaded in the iframe (& it's not the SingleSignOut page),
             // the user is still logged into AAD, but the session changed for some reason.
             // Restart the timer on the top window and point the iframe back to check session endpoint
-            window.top.timerID = window.top.setTimer(window.top.check_session, "@SessionManagement.App_Start.OwinStartup.SessionState",
-                "@SessionManagement.App_Start.OwinStartup.ClientId", "@SessionManagement.App_Start.OwinStartup.AADInstance");
-            window.top.op_frame.src = "@SessionManagement.App_Start.OwinStartup.CheckSessionIFrame";
+            window.top.timerID = window.top.setTimer(window.top.check_session, "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.SessionState",
+                "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.ClientId", "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.AADInstance");
+            window.top.op_frame.src = "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.CheckSessionIFrame";
         }
 
     </script>
