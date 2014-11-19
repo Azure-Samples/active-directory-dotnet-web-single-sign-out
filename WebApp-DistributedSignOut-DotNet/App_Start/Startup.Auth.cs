@@ -26,7 +26,6 @@ namespace WebAppDistributedSignOutDotNet.App_Start
         private static string clientId = ConfigurationManager.AppSettings["ida:ClientId"];
         private static string postLogoutRedirectUri = ConfigurationManager.AppSettings["ida:PostLogoutRedirectUri"];
         private static string redirectUri = ConfigurationManager.AppSettings["ida:RedirectUri"];
-        private static string tenant = ConfigurationManager.AppSettings["ida:Tenant"];
         
         public static string PostLogoutRedirectUri
         {
@@ -59,6 +58,11 @@ namespace WebAppDistributedSignOutDotNet.App_Start
             get;
             set;
         }
+        private static string TenantIssuerAddress
+        {
+            get;
+            set;
+        }
 
         public void ConfigureAuth(IAppBuilder app)
         {
@@ -70,7 +74,13 @@ namespace WebAppDistributedSignOutDotNet.App_Start
                     ClientId = clientId,
                     PostLogoutRedirectUri = postLogoutRedirectUri,
                     RedirectUri = redirectUri,
-                    Authority = aadInstance + tenant,
+                    Authority = AADInstance + "common",
+                    TokenValidationParameters = new TokenValidationParameters
+                    {
+                        // NOTE: Not Good Practice. See https://github.com/AzureADSamples/WebApp-MultiTenant-OpenIdConnect-DotNet
+                        // for proper issues validation in a multi-tenant app.
+                        ValidateIssuer = false,
+                    },
                     Notifications =
                         new OpenIdConnectAuthenticationNotifications
                         {
@@ -94,6 +104,7 @@ namespace WebAppDistributedSignOutDotNet.App_Start
                 notification.Response.Cookies.Append("SingleSignOut" + clientId, notification.ProtocolMessage.State);
 
                 notification.ProtocolMessage.Prompt = "none";
+                notification.ProtocolMessage.IssuerAddress = TenantIssuerAddress;
                 string redirectUrl = notification.ProtocolMessage.BuildRedirectUrl();
                 notification.Response.Redirect("/Account/SessionChanged?" + notification.ProtocolMessage.BuildRedirectUrl());
                 notification.HandleResponse();
@@ -104,11 +115,18 @@ namespace WebAppDistributedSignOutDotNet.App_Start
         
         // We need to update these values each time we receive a new token, so the SingleSignOut
         // javascript has access to the correct values.
-        public static Task SecurityTokenValidated(SecurityTokenValidatedNotification<OpenIdConnectMessage, OpenIdConnectAuthenticationOptions> notification)
+        public async static Task SecurityTokenValidated(SecurityTokenValidatedNotification<OpenIdConnectMessage, OpenIdConnectAuthenticationOptions> notification)
         {
+            // Get Tenant-Specific Metadata (Authorization Endpoint), needed for making prompt=none request in RedirectToIdentityProvider
+            OpenIdConnectAuthenticationOptions tenantSpecificOptions = new OpenIdConnectAuthenticationOptions();
+            tenantSpecificOptions.Authority = AADInstance + notification.AuthenticationTicket.Identity.FindFirst("http://schemas.microsoft.com/identity/claims/tenantid").Value;
+            tenantSpecificOptions.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(tenantSpecificOptions.Authority + "/.well-known/openid-configuration");
+            OpenIdConnectConfiguration tenantSpecificConfig = await tenantSpecificOptions.ConfigurationManager.GetConfigurationAsync(notification.Request.CallCancelled);
+            TenantIssuerAddress = tenantSpecificConfig.AuthorizationEndpoint;
+
             CheckSessionIFrame = notification.AuthenticationTicket.Properties.Dictionary[Microsoft.IdentityModel.Protocols.OpenIdConnectSessionProperties.CheckSessionIFrame];
             SessionState = notification.AuthenticationTicket.Properties.Dictionary[Microsoft.IdentityModel.Protocols.OpenIdConnectSessionProperties.SessionState];
-            return Task.FromResult<object>(null);
+            return;
         }
 
         // If the javascript issues an OIDC authorize request, and it fails (meaning the user needs to login)
