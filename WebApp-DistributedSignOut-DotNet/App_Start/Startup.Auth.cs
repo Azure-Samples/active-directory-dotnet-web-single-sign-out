@@ -60,6 +60,12 @@ namespace WebAppDistributedSignOutDotNet.App_Start
             set;
         }
 
+        public static PropertiesDataFormat StateDataFormat
+        {
+            get;
+            set;
+        }
+
         public void ConfigureAuth(IAppBuilder app)
         {
             app.SetDefaultSignInAsAuthenticationType(CookieAuthenticationDefaults.AuthenticationType);
@@ -80,6 +86,10 @@ namespace WebAppDistributedSignOutDotNet.App_Start
                             SecurityTokenValidated = OwinStartup.SecurityTokenValidated,
                         },
                 });
+
+            StateDataFormat = new PropertiesDataFormat(app.CreateDataProtector(
+                typeof(OpenIdConnectAuthenticationMiddleware).FullName,
+                OpenIdConnectAuthenticationDefaults.AuthenticationType, "v1"));
         }
 
         #region Notification hooks
@@ -89,10 +99,6 @@ namespace WebAppDistributedSignOutDotNet.App_Start
             // If a challenge was issued by the SingleSignOut javascript
             if (notification.Request.Path.Value == "/Account/SessionChanged")
             {
-                // Store an app-specific cookie so we can identify OIDC messages that occurred
-                // as a result of the SingleSignOut javascript.
-                notification.Response.Cookies.Append("SingleSignOut" + clientId, notification.ProtocolMessage.State);
-
                 notification.ProtocolMessage.Prompt = "none";
                 string redirectUrl = notification.ProtocolMessage.BuildRedirectUrl();
                 notification.Response.Redirect("/Account/SessionChanged?" + notification.ProtocolMessage.BuildRedirectUrl());
@@ -115,14 +121,16 @@ namespace WebAppDistributedSignOutDotNet.App_Start
         // this notification will be triggered with the error message 'login_required'
         public static Task AuthenticationFailed(AuthenticationFailedNotification<OpenIdConnectMessage, OpenIdConnectAuthenticationOptions> notification)
         {
+            AuthenticationProperties authProps = (AuthenticationProperties)StateDataFormat.Unprotect(
+                Uri.UnescapeDataString(notification.ProtocolMessage.State.Substring(
+                notification.ProtocolMessage.State.IndexOf("=") + 1)));
+
             // If the failed authentication was a result of a request by the SingleSignOut javascript
-            if (notification.Request.Cookies["SingleSignOut" + clientId] != null 
-                && notification.Request.Cookies["SingleSignOut" + clientId].Contains(notification.ProtocolMessage.State) 
+            if (authProps.RedirectUri.Contains("SessionChanged") 
                 && notification.Exception.Message == "login_required")
             {
-                // Clear the SingleSignOut cookie, and clear the OIDC session state so 
-                //that we don't see any further "Session Changed" messages from the iframe.
-                notification.Response.Cookies.Append("SingleSignOut" + clientId, "");
+                // Clear the OIDC session state so that we don't see any 
+                // further "Session Changed" messages from the iframe.
                 SessionState = "";
                 notification.Response.Redirect("Account/SingleSignOut");
                 notification.HandleResponse();
@@ -131,7 +139,7 @@ namespace WebAppDistributedSignOutDotNet.App_Start
             return Task.FromResult<object>(null);
         }
         
-        // If the javascript issues an OIDC authorize reuest, and it succeeds, the user is already logged
+        // If the javascript issues an OIDC authorize request, and it succeeds, the user is already logged
         // into AAD.  Since the AAD session cookie has changed, we need to check if the same use is still
         // logged in.
         public static Task AuthorizationCodeRecieved(AuthorizationCodeReceivedNotification notification)
@@ -139,9 +147,6 @@ namespace WebAppDistributedSignOutDotNet.App_Start
             // If the successful authorize request was issued by the SingleSignOut javascript
             if (notification.AuthenticationTicket.Properties.RedirectUri.Contains("SessionChanged")) 
             {
-                // Clear the SingleSignOutCookie
-                notification.Response.Cookies.Append("SingleSignOut" + clientId, "");
-
                 Claim existingUserObjectId = notification.OwinContext.Authentication.User.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier");
                 Claim incomingUserObjectId = notification.AuthenticationTicket.Identity.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier");
 
