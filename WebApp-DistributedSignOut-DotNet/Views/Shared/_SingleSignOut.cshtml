@@ -68,7 +68,7 @@
                 window.addEventListener("message", rp_receiveMessage, false);
             }
 
-        } else if (window.location.pathname == "/Account/SingleSignOut" && window.top.op_frame && window == window.top.op_frame.contentWindow) {
+        } else if (window.location.pathname == "/Account/SingleSignOut") {
             // If we come to the SingleSignOut page in the iframe, the user has been logged out. 
             // Redirect the browser window to the same page.
             try {
@@ -80,11 +80,10 @@
                     "?redirectUri=" + encodeURIComponent(window.parent.location.href);
             }
 
-        } else if (window.top.op_frame && window == window.top.op_frame.contentWindow) {
+        } else {
             // If a page in the app is loaded in the iframe (& it's not the SingleSignOut page),
             // the user is still logged into AAD, but the session changed for some reason.
             // Restart the timer on the top window and point the iframe back to check session endpoint
-            clearInterval(window.top.timerID);
             window.top.timerID = window.top.setTimer(window.top.check_session, "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.SessionState",
                 "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.ClientId", "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.AADInstance");
             window.top.op_frame.src = "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.CheckSessionIFrame";
