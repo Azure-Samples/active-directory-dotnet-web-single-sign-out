@@ -1,4 +1,6 @@
 ﻿using Microsoft.IdentityModel.Protocols;
+using Microsoft.Owin;
+using Microsoft.Owin.Infrastructure;
 using Microsoft.Owin.Security;
 using Microsoft.Owin.Security.Cookies;
 using Microsoft.Owin.Security.DataHandler;
@@ -14,6 +16,8 @@ using System.Net.Security;
 using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
+using System.Web;
+using System.Web.Mvc;
 
 namespace WebAppDistributedSignOutDotNet.App_Start
 {
@@ -26,6 +30,7 @@ namespace WebAppDistributedSignOutDotNet.App_Start
         private static string clientId = ConfigurationManager.AppSettings["ida:ClientId"];
         private static string postLogoutRedirectUri = ConfigurationManager.AppSettings["ida:PostLogoutRedirectUri"];
         private static string redirectUri = ConfigurationManager.AppSettings["ida:RedirectUri"];
+        private static string cookieName = CookieAuthenticationDefaults.CookiePrefix + CookieAuthenticationDefaults.AuthenticationType;
         
         public static string PostLogoutRedirectUri
         {
@@ -53,21 +58,24 @@ namespace WebAppDistributedSignOutDotNet.App_Start
             get { return redirectUri; }
         }
 
-        public static string SessionState
+        public static TicketDataFormat ticketDataFormat
         {
             get;
             set;
         }
-        private static string TenantIssuerAddress
+        public static string CookieName
         {
-            get;
-            set;
+            get { return cookieName; }
         }
 
         public void ConfigureAuth(IAppBuilder app)
         {
             app.SetDefaultSignInAsAuthenticationType(CookieAuthenticationDefaults.AuthenticationType);
-            app.UseCookieAuthentication(new CookieAuthenticationOptions());
+            CookieAuthenticationOptions cookieOptions = new CookieAuthenticationOptions 
+            { 
+                CookieName = CookieName,
+            };
+            app.UseCookieAuthentication(cookieOptions);
             app.UseOpenIdConnectAuthentication(
                 new OpenIdConnectAuthenticationOptions
                 {
@@ -90,6 +98,11 @@ namespace WebAppDistributedSignOutDotNet.App_Start
                             SecurityTokenValidated = OwinStartup.SecurityTokenValidated,
                         },
                 });
+
+            IDataProtector dataProtector = app.CreateDataProtector(
+                typeof(CookieAuthenticationMiddleware).FullName,
+                cookieOptions.AuthenticationType, "v1");
+            ticketDataFormat = new TicketDataFormat(dataProtector);
         }
 
         #region Notification hooks
@@ -97,16 +110,23 @@ namespace WebAppDistributedSignOutDotNet.App_Start
         public static Task RedirectToIdentityProvider(RedirectToIdentityProviderNotification<OpenIdConnectMessage, OpenIdConnectAuthenticationOptions> notification)
         {
             // If a challenge was issued by the SingleSignOut javascript
-            if (notification.Request.Path.Value == "/Account/SessionChanged")
+            UrlHelper url = new UrlHelper(HttpContext.Current.Request.RequestContext);
+            if (notification.Request.Uri.AbsolutePath == url.Action("SessionChanged", "Account"))
             {
-                // Store an app-specific cookie so we can identify OIDC messages that occurred
+                // Store the state in the cookie so we can distinguish OIDC messages that occurred
                 // as a result of the SingleSignOut javascript.
-                notification.Response.Cookies.Append("SingleSignOut" + clientId, notification.ProtocolMessage.State);
+                ICookieManager cookieManager = new ChunkingCookieManager();
+                string cookie = cookieManager.GetRequestCookie(notification.OwinContext, CookieName);
+                AuthenticationTicket ticket = ticketDataFormat.Unprotect(cookie);
+                if (ticket.Properties.Dictionary != null)
+                    ticket.Properties.Dictionary[OpenIdConnectAuthenticationDefaults.AuthenticationType + "SingleSignOut"] = notification.ProtocolMessage.State;
+                cookieManager.AppendResponseCookie(notification.OwinContext, CookieName, ticketDataFormat.Protect(ticket), new CookieOptions());
 
+                // Return prompt=none request (to tenant specific endpoint) to SessionChanged controller.
                 notification.ProtocolMessage.Prompt = "none";
-                notification.ProtocolMessage.IssuerAddress = TenantIssuerAddress;
+                notification.ProtocolMessage.IssuerAddress = notification.OwinContext.Authentication.User.FindFirst("issEndpoint").Value;
                 string redirectUrl = notification.ProtocolMessage.BuildRedirectUrl();
-                notification.Response.Redirect("/Account/SessionChanged?" + notification.ProtocolMessage.BuildRedirectUrl());
+                notification.Response.Redirect(url.Action("SessionChanged", "Account") + "?" + redirectUrl);
                 notification.HandleResponse();
             }
 
@@ -122,10 +142,9 @@ namespace WebAppDistributedSignOutDotNet.App_Start
             tenantSpecificOptions.Authority = AADInstance + notification.AuthenticationTicket.Identity.FindFirst("http://schemas.microsoft.com/identity/claims/tenantid").Value;
             tenantSpecificOptions.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(tenantSpecificOptions.Authority + "/.well-known/openid-configuration");
             OpenIdConnectConfiguration tenantSpecificConfig = await tenantSpecificOptions.ConfigurationManager.GetConfigurationAsync(notification.Request.CallCancelled);
-            TenantIssuerAddress = tenantSpecificConfig.AuthorizationEndpoint;
+            notification.AuthenticationTicket.Identity.AddClaim(new Claim("issEndpoint", tenantSpecificConfig.AuthorizationEndpoint, ClaimValueTypes.String, "WebApp-Distributed-SignOut-DotNet"));
 
-            CheckSessionIFrame = notification.AuthenticationTicket.Properties.Dictionary[Microsoft.IdentityModel.Protocols.OpenIdConnectSessionProperties.CheckSessionIFrame];
-            SessionState = notification.AuthenticationTicket.Properties.Dictionary[Microsoft.IdentityModel.Protocols.OpenIdConnectSessionProperties.SessionState];
+            CheckSessionIFrame = notification.AuthenticationTicket.Properties.Dictionary[OpenIdConnectSessionProperties.CheckSessionIFrame];
             return;
         }
 
@@ -133,15 +152,22 @@ namespace WebAppDistributedSignOutDotNet.App_Start
         // this notification will be triggered with the error message 'login_required'
         public static Task AuthenticationFailed(AuthenticationFailedNotification<OpenIdConnectMessage, OpenIdConnectAuthenticationOptions> notification)
         {
+            string cookieStateValue = null;
+            ICookieManager cookieManager = new ChunkingCookieManager();
+            string cookie = cookieManager.GetRequestCookie(notification.OwinContext, CookieName);
+            AuthenticationTicket ticket = ticketDataFormat.Unprotect(cookie);
+            if (ticket.Properties.Dictionary != null)
+                ticket.Properties.Dictionary.TryGetValue(OpenIdConnectAuthenticationDefaults.AuthenticationType + "SingleSignOut", out cookieStateValue);
+
             // If the failed authentication was a result of a request by the SingleSignOut javascript
-            if (notification.Request.Cookies["SingleSignOut" + clientId] != null 
-                && notification.Request.Cookies["SingleSignOut" + clientId].Contains(notification.ProtocolMessage.State) 
-                && notification.Exception.Message == "login_required")
+            if (cookieStateValue != null && cookieStateValue.Contains(notification.ProtocolMessage.State) && notification.Exception.Message == "login_required");
             {
                 // Clear the SingleSignOut cookie, and clear the OIDC session state so 
                 //that we don't see any further "Session Changed" messages from the iframe.
-                notification.Response.Cookies.Append("SingleSignOut" + clientId, "");
-                SessionState = "";
+                ticket.Properties.Dictionary[OpenIdConnectSessionProperties.SessionState] = "";
+                ticket.Properties.Dictionary[OpenIdConnectAuthenticationDefaults.AuthenticationType + "SingleSignOut"] = "";
+                cookieManager.AppendResponseCookie(notification.OwinContext, CookieName, ticketDataFormat.Protect(ticket), new CookieOptions());
+                
                 notification.Response.Redirect("Account/SingleSignOut");
                 notification.HandleResponse();
             }
@@ -153,12 +179,17 @@ namespace WebAppDistributedSignOutDotNet.App_Start
         // into AAD.  Since the AAD session cookie has changed, we need to check if the same use is still
         // logged in.
         public static Task AuthorizationCodeRecieved(AuthorizationCodeReceivedNotification notification)
-        {   
+        {
             // If the successful authorize request was issued by the SingleSignOut javascript
             if (notification.AuthenticationTicket.Properties.RedirectUri.Contains("SessionChanged")) 
             {
-                // Clear the SingleSignOutCookie
-                notification.Response.Cookies.Append("SingleSignOut" + clientId, "");
+                // Clear the SingleSignOut Cookie
+                ICookieManager cookieManager = new ChunkingCookieManager();
+                string cookie = cookieManager.GetRequestCookie(notification.OwinContext, CookieName);
+                AuthenticationTicket ticket = ticketDataFormat.Unprotect(cookie);
+                if (ticket.Properties.Dictionary != null)
+                    ticket.Properties.Dictionary[OpenIdConnectAuthenticationDefaults.AuthenticationType + "SingleSignOut"] = "";
+                cookieManager.AppendResponseCookie(notification.OwinContext, CookieName, ticketDataFormat.Protect(ticket), new CookieOptions());
 
                 Claim existingUserObjectId = notification.OwinContext.Authentication.User.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier");
                 Claim incomingUserObjectId = notification.AuthenticationTicket.Identity.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier");

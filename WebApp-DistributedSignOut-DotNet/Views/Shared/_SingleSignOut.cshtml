@@ -2,93 +2,99 @@
 {   
     <script type="text/javascript">
 
-        // If a page of our application is being loaded in the browser window.
-        if (window.self === window.top) {
+    // If a page of our application is being loaded in the browser window.
+    if (window.self === window.top) {
 
-            // Append a hidden iframe to the page that will poll the AAD session cookie
-            // to check if the session with AAD has changed.  The code to check the cookie will be
-            // sourced from the CheckSessionIFrame endpoint.
-            var timerID;
-            var op_frame = document.createElement("iframe");
-            op_frame.setAttribute("src", "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.CheckSessionIFrame");
-            op_frame.setAttribute("hidden", "hidden");
-            document.body.appendChild(op_frame);
-            
-            // At some interval, postMessage to the iFrame to check the AAD session cookie.
-            function check_session(sessionState, clientId, aadInstance) {
-                try {
-                    // Only call check session if the iframe is currently pointed at login.windows.net
-                    if (op_frame.contentWindow.location.protocol + "//" +
-                        op_frame.contentWindow.location.hostname == aadInstance) {
-                        var message = clientId + ' ' + sessionState;
-                        op_frame.contentWindow.postMessage(message, aadInstance);
-                    }
-                } catch (e) {
+        // Append a hidden iframe to the page that will poll the AAD session cookie
+        // to check if the session with AAD has changed.  The code to check the cookie will be
+        // sourced from the CheckSessionIFrame endpoint.
+        var timerID;
+        var op_frame = document.createElement("iframe");
+        op_frame.setAttribute("src", "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.CheckSessionIFrame");
+        op_frame.setAttribute("hidden", "hidden");
+        document.body.appendChild(op_frame);
+
+        // At some interval, postMessage to the iFrame to check the AAD session cookie.
+        function check_session(sessionState, clientId, aadInstance) {
+            try {
+                // Only call check session if the iframe is currently pointed at login.windows.net
+                if (op_frame.contentWindow.location.protocol + "//" +
+                    op_frame.contentWindow.location.hostname == aadInstance) {
                     var message = clientId + ' ' + sessionState;
                     op_frame.contentWindow.postMessage(message, aadInstance);
                 }
-            }
-   
-            // If the iFrame returns a message indicating a change in the session state,
-            // make an OpenIDConnect authorize request to AAD to check login status.
-            function rp_receiveMessage(e) {
-            
-                if (e.data == "changed") {
-                    clearInterval(timerID);            
-
-                    // Call into the app's SessionChanged action to construct the request url for us.
-                    $.ajax({
-                        type: "GET",
-                        dataType: "json",
-                        url: "/Account/SessionChanged"
-                    }).done(
-                    // a successfull return will send the OIDC request to AAD by setting the iFrame's src
-                    function (openIdConnectRequest) {
-                        op_frame.src = openIdConnectRequest;
-                    }).fail(
-                    function (e) {
-                        alert("Session check failed, might want to ask user to re-auth.");
-                    });
-                }
-            }
-
-            // Sets check_session to start polling
-            function setTimer(checkSessionFunction, sessionState, clientId, aadInstance) {
-                checkSessionFunction(sessionState, clientId, aadInstance);
-                timerID = setInterval(function () {
-                    checkSessionFunction(sessionState, clientId, aadInstance);
-                }, 3000);
-            }
-
-            if (window.addEventListener) {
-                window.addEventListener("load", setTimer(check_session,
-                    "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.SessionState",
-                    "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.ClientId",
-                    "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.AADInstance"), false);
-                window.addEventListener("message", rp_receiveMessage, false);
-            }
-
-        } else if (window.location.pathname == "/Account/SingleSignOut" && window.top.op_frame && window == window.top.op_frame.contentWindow) {
-            // If we come to the SingleSignOut page in the iframe, the user has been logged out. 
-            // Redirect the browser window to the same page.
-            try {
-                if (window.self !== window.top)
-                    window.parent.location.href = window.location.href +
-                        "?redirectUri=" + encodeURIComponent(window.parent.location.href);
             } catch (e) {
-                window.top.location.href = window.location.href +
-                    "?redirectUri=" + encodeURIComponent(window.parent.location.href);
+                var message = clientId + ' ' + sessionState;
+                op_frame.contentWindow.postMessage(message, aadInstance);
             }
-
-        } else if (window.top.op_frame && window == window.top.op_frame.contentWindow) {
-            // If a page in the app is loaded in the iframe (& it's not the SingleSignOut page),
-            // the user is still logged into AAD, but the session changed for some reason.
-            // Restart the timer on the top window and point the iframe back to check session endpoint
-            clearInterval(window.top.timerID);
-            window.top.timerID = window.top.setTimer(window.top.check_session, "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.SessionState",
-                "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.ClientId", "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.AADInstance");
-            window.top.op_frame.src = "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.CheckSessionIFrame";
         }
+
+        // If the iFrame returns a message indicating a change in the session state,
+        // make an OpenIDConnect authorize request to AAD to check login status.
+        function rp_receiveMessage(e) {
+
+            if (e.data == "changed") {
+                clearInterval(timerID);
+
+                // Call into the app's SessionChanged action to construct the request url for us.
+                $.ajax({
+                    type: "GET",
+                    dataType: "json",
+                    url: "/Account/SessionChanged"
+                }).done(
+                // a successfull return will send the OIDC request to AAD by setting the iFrame's src
+                function (openIdConnectRequest) {
+                    op_frame.src = openIdConnectRequest;
+                }).fail(
+                function (e) {
+                    alert("Session check failed, might want to ask user to re-auth.");
+                });
+            }
+        }
+
+        // Sets check_session to start polling
+        function setTimer(checkSessionFunction, sessionState, clientId, aadInstance) {
+            checkSessionFunction(sessionState, clientId, aadInstance);
+            timerID = setInterval(function () {
+                checkSessionFunction(sessionState, clientId, aadInstance);
+            }, 3000);
+        }
+
+        @{
+            Microsoft.Owin.Infrastructure.ICookieManager cookieManager = new Microsoft.Owin.Infrastructure.ChunkingCookieManager();
+            string cookie = cookieManager.GetRequestCookie(HttpContext.Current.GetOwinContext(), WebAppDistributedSignOutDotNet.App_Start.OwinStartup.CookieName);
+            Microsoft.Owin.Security.AuthenticationTicket ticket = WebAppDistributedSignOutDotNet.App_Start.OwinStartup.ticketDataFormat.Unprotect(cookie);
+        }
+
+        if (window.addEventListener) {
+            window.addEventListener("load", setTimer(check_session,
+               "@ticket.Properties.Dictionary[Microsoft.IdentityModel.Protocols.OpenIdConnectSessionProperties.SessionState]",
+                "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.ClientId",
+                "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.AADInstance"), false);
+            window.addEventListener("message", rp_receiveMessage, false);
+        }
+
+    } else if (window.location.pathname == "/Account/SingleSignOut" && window.top.op_frame && window == window.top.op_frame.contentWindow) {
+        // If we come to the SingleSignOut page in the iframe, the user has been logged out.
+        // Redirect the browser window to the same page.
+        try {
+            if (window.self !== window.top)
+                window.parent.location.href = window.location.href +
+                    "?redirectUri=" + encodeURIComponent(window.parent.location.href);
+        } catch (e) {
+            window.top.location.href = window.location.href +
+                "?redirectUri=" + encodeURIComponent(window.parent.location.href);
+        }
+
+    } else if (window.top.op_frame && window == window.top.op_frame.contentWindow) {
+        // If a page in the app is loaded in the iframe (& it's not the SingleSignOut page),
+        // the user is still logged into AAD, but the session changed for some reason.
+        // Restart the timer on the top window and point the iframe back to check session endpoint
+        clearInterval(window.top.timerID);
+        window.top.timerID = window.top.setTimer(window.top.check_session, "@ticket.Properties.Dictionary[Microsoft.IdentityModel.Protocols.OpenIdConnectSessionProperties.SessionState]",
+            "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.ClientId", "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.AADInstance");
+        window.top.op_frame.src = "@WebAppDistributedSignOutDotNet.App_Start.OwinStartup.CheckSessionIFrame";
+    }
 
     </script>
 }

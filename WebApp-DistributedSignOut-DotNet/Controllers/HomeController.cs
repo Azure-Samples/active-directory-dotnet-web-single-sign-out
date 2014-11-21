@@ -1,4 +1,14 @@
 ﻿using System.Web.Mvc;
+using System.Web;
+using Microsoft.Owin.Security.Cookies;
+using Microsoft.Owin.Security.DataProtection;
+using Microsoft.Owin.Infrastructure;
+using WebAppDistributedSignOutDotNet.App_Start;
+using Microsoft.Owin.Security;
+using Microsoft.IdentityModel.Protocols;
+
+
+//The following libraries were added to this sample.
 
 namespace WebAppDistributedSignOutDotNet.Controllers
 {
