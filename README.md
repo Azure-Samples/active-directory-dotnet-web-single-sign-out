@@ -1,4 +1,4 @@
-WebApp-DistributedSignOut-DotNet
+Performing single sign out of all web apps using Azure AD
 ================================
 
 This sample shows how to build an MVC web application that uses Azure AD for sign-in using the OpenID Connect protocol and provides Single Sign Out across web apps.
