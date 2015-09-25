@@ -1,5 +1,10 @@
+---
+services: active-directory
+platforms: dotnet
+author: dstrockis
+---
+
 Performing single sign out of all web apps using Azure AD
-================================
 
 This sample shows how to build an MVC web application that uses Azure AD for sign-in using the OpenID Connect protocol and provides Single Sign Out across web apps.
 
@@ -25,7 +30,7 @@ Every Azure subscription has an associated Azure Active Directory tenant.  If yo
 
 From your shell or command line:
 
-`git clone https://github.com/AzureADSamples/WebApp-GroupClaims-DotNet.git`
+`git clone https://github.com/Azure-Samples/active-directory-dotnet-web-single-sign-out.git`
 
 ### Step 2:  Create a user account in your Azure Active Directory tenant
 
