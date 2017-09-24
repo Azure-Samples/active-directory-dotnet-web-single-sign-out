@@ -10,7 +10,7 @@ This sample shows how to build an MVC web application that uses Azure AD for sig
 
 For more information about how the OpenID Connect protocol works in this scenario, see the [OpenID Connect Session Management Specfication](http://openid.net/specs/openid-connect-session-1_0.html).
 
-##About The Sample
+## About The Sample
 If you would like to get started immediately, skip this section and jump to *How To Run The Sample*. 
 
 This MVC 5 web application allows the user to sign in to the application with an AAD account.  Once signed in, if the user signs out of another application that has been authenticated using the same AAD tenant, this application will automatically sign the user out and display a message notifying the user.  Similarly, when the user signs out of this application, they will be signed out of any other applications that use the same AAD tenant and that have implemented Single Sign Out.
@@ -70,27 +70,27 @@ Clean the solution, rebuild the solution, and run it.  NOTE: Be sure not to run 
 
 For the most part, you can simply cut and paste the code from this sample into your OWIN application in order to provide Single Sign Out functionality.  But for a deeper understanding of the code and the OpenID Connect Session Managment protocol, take a look at the following five files:
 
-####_Layout.cshtml
+#### _Layout.cshtml
 
 In `_Layout.cshtml`, you simply need to render the _SingleSignOut.cshtml partial view, so that the Single Sign Out related javascript is loaded into every page in the application.
 
-####_SingleSignOut.cshtml
+#### _SingleSignOut.cshtml
 
 This partial view is where the majority of the action takes place.  In order to know when to perform Single Sign Out, the application needs a way to check the status of the user's session with Azure AD.  This could be achieved by polling AAD periodically, but would incur more network cost than is necessary.  Instead, the application will periodically check the value of a cookie that is set by AAD on login, as directed by the OpenID Connect Session Management specfication.  Only if the value of the cookie has changed will the application then submit a request to AAD to check the status of the user's session with AAD.  AAD provides a "CheckSessionIframe" to peform this check for you that is used in this sample.
 
 When a page in the application loads, the javascript loads the CheckSessionIframe in a hidden iFrame.  On a periodic basis, it triggers the CheckSessionIFrame to check the AAD cookie and notify the application of any changes.  If a change in the AAD session has been detected, the iFrame is pointed to AAD's authorize endpoint, submitting an authorization request to AAD without requring user interaction (since the iFrame is hidden, of course). The result of this authorization request will be processed by the OWIN OpenIDConnect Middleware, described below in `Startup.Auth.cs`.
 
-####AccountController.cs
+#### AccountController.cs
 
 In `AccountController.cs`, there are two actions to note.  The `SessionChanged` action is a shortcut that is used to construct the authorization request that is submitted to AAD.  The javascript submits an ajax request to this action, which subsequently issues an OpenID Connect challenge.  This challenge triggers OWIN to construct an authorization request and submit it to AAD.  But instead of allowing OWIN to submit the authorization request, the request is intercepted in `Startup.Auth.cs`'s `RedirectToIdentityProvider` notification and is returned to the originating javascript via `SessionChanged` as the result of the ajax request.  In this way, the javascript does not have to construct an authorization request on its own.
 
 The other action to note is `SingleSignOut`, which actually signs the user out of the application and displays a message telling the user that a Single Sign Out has occurred.
 
-####SingleSignOut.cshtml
+#### SingleSignOut.cshtml
 
 Presents the Single Sign Out occurred message to the user.
 
-####Startup.Auth.cs
+#### Startup.Auth.cs
 
 In `Startup.Auth.cs`, two `OpenIDConnectAuthenticationNotifications` callbacks are used to process the authorization request result from AAD.  If the request fails, it can be interpreted as the user needing to reauthenticate with AAD (and that the user should be signed out of the application).  OWIN triggers the `AuthenticationFailed` callback, which signs the user out using the `SingleSignOut` action.
 
