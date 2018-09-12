@@ -40,6 +40,10 @@
       "SettingFile": "\\..\\WebApp-DistributedSignOut-DotNet\\Web.Config",
       "Mappings": [
         {
+          "key": "ida:Tenant",
+          "value": "$tenantName"
+        },
+        {
           "key": "ida:ClientId",
           "value": ".AppId"
         },

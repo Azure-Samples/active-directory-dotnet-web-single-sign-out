@@ -60,6 +60,13 @@ namespace WebAppDistributedSignOutDotNet.Controllers
             }
         }
 
+        public void EndSession()
+        {
+            Request.GetOwinContext().Authentication.SignOut();
+            Request.GetOwinContext().Authentication.SignOut(Microsoft.AspNet.Identity.DefaultAuthenticationTypes.ApplicationCookie);
+            this.HttpContext.GetOwinContext().Authentication.SignOut(CookieAuthenticationDefaults.AuthenticationType);
+        }
+
         // Sign a user out of both AAD and the Application
         public void SignOut()
         {

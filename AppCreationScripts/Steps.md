@@ -97,6 +97,7 @@ Open the solution in Visual Studio to configure the projects
 #### Configure the service project
 
 1. Open the `WebApp-DistributedSignOut-DotNet\Web.Config` file
+1. Find the app key `ida:Tenant` and replace the existing value with your Azure AD tenant name.
 1. Find the app key `ida:ClientId` and replace the existing value with the application ID (clientId) of the `WebApp-DistributedSignOut-DotNet` application copied from the Azure portal.
 1. Find the app key `ida:AppKey` and replace the existing value with the key you saved during the creation of the `WebApp-DistributedSignOut-DotNet` app, in the Azure portal.
 1. Find the app key `ida:PostLogoutRedirectUri` and replace the existing value with the base address of the WebApp-DistributedSignOut-DotNet project (by default `https://localhost:44308/`).

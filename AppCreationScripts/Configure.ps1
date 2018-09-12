@@ -206,6 +206,7 @@ Function ConfigureApplications
    # Update config file for 'service'
    $configFile = $pwd.Path + "\..\WebApp-DistributedSignOut-DotNet\Web.Config"
    Write-Host "Updating the sample code ($configFile)"
+   ReplaceSetting -configFilePath $configFile -key "ida:Tenant" -newValue $tenantName
    ReplaceSetting -configFilePath $configFile -key "ida:ClientId" -newValue $serviceAadApplication.AppId
    ReplaceSetting -configFilePath $configFile -key "ida:AppKey" -newValue $serviceAppKey
    ReplaceSetting -configFilePath $configFile -key "ida:PostLogoutRedirectUri" -newValue $serviceAadApplication.HomePage

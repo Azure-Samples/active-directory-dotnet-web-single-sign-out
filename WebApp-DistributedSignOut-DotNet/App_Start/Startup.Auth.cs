@@ -11,6 +11,7 @@ using Owin;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Globalization;
 using System.IdentityModel.Tokens;
 using System.Net.Security;
 using System.Security.Claims;
@@ -26,12 +27,14 @@ namespace WebAppDistributedSignOutDotNet.App_Start
         // These public properties are required to enable the partial views to access their values.
 
         private static string appKey = ConfigurationManager.AppSettings["ida:AppKey"];
+        private static string tenant = ConfigurationManager.AppSettings["ida:Tenant"];
         private static string aadInstance = ConfigurationManager.AppSettings["ida:AADInstance"];
         private static string clientId = ConfigurationManager.AppSettings["ida:ClientId"];
         private static string postLogoutRedirectUri = ConfigurationManager.AppSettings["ida:PostLogoutRedirectUri"];
         private static string redirectUri = ConfigurationManager.AppSettings["ida:RedirectUri"];
         private static string cookieName = CookieAuthenticationDefaults.CookiePrefix + CookieAuthenticationDefaults.AuthenticationType;
-        
+        public static readonly string Authority = String.Format(CultureInfo.InvariantCulture, aadInstance, tenant);
+
         public static string PostLogoutRedirectUri
         {
             get { return postLogoutRedirectUri;  }
@@ -76,13 +79,14 @@ namespace WebAppDistributedSignOutDotNet.App_Start
                 CookieName = CookieName,
             };
             app.UseCookieAuthentication(cookieOptions);
+
             app.UseOpenIdConnectAuthentication(
                 new OpenIdConnectAuthenticationOptions
                 {
                     ClientId = clientId,
                     PostLogoutRedirectUri = postLogoutRedirectUri,
                     RedirectUri = redirectUri,
-                    Authority = AADInstance + "common",
+                    Authority = Authority,
                     TokenValidationParameters = new TokenValidationParameters
                     {
                         // NOTE: Not Good Practice. See https://github.com/AzureADSamples/WebApp-MultiTenant-OpenIdConnect-DotNet
@@ -117,6 +121,7 @@ namespace WebAppDistributedSignOutDotNet.App_Start
                 // as a result of the SingleSignOut javascript.
                 ICookieManager cookieManager = new ChunkingCookieManager();
                 string cookie = cookieManager.GetRequestCookie(notification.OwinContext, CookieName);
+
                 AuthenticationTicket ticket = ticketDataFormat.Unprotect(cookie);
                 if (ticket.Properties.Dictionary != null)
                     ticket.Properties.Dictionary[OpenIdConnectAuthenticationDefaults.AuthenticationType + "SingleSignOut"] = notification.ProtocolMessage.State;
@@ -125,6 +130,7 @@ namespace WebAppDistributedSignOutDotNet.App_Start
                 // Return prompt=none request (to tenant specific endpoint) to SessionChanged controller.
                 notification.ProtocolMessage.Prompt = "none";
                 notification.ProtocolMessage.IssuerAddress = notification.OwinContext.Authentication.User.FindFirst("issEndpoint").Value;
+
                 string redirectUrl = notification.ProtocolMessage.BuildRedirectUrl();
                 notification.Response.Redirect(url.Action("SessionChanged", "Account") + "?" + redirectUrl);
                 notification.HandleResponse();
@@ -139,8 +145,9 @@ namespace WebAppDistributedSignOutDotNet.App_Start
         {
             // Get Tenant-Specific Metadata (Authorization Endpoint), needed for making prompt=none request in RedirectToIdentityProvider
             OpenIdConnectAuthenticationOptions tenantSpecificOptions = new OpenIdConnectAuthenticationOptions();
-            tenantSpecificOptions.Authority = AADInstance + notification.AuthenticationTicket.Identity.FindFirst("http://schemas.microsoft.com/identity/claims/tenantid").Value;
+            tenantSpecificOptions.Authority = string.Format(AADInstance, notification.AuthenticationTicket.Identity.FindFirst("http://schemas.microsoft.com/identity/claims/tenantid").Value);
             tenantSpecificOptions.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(tenantSpecificOptions.Authority + "/.well-known/openid-configuration");
+
             OpenIdConnectConfiguration tenantSpecificConfig = await tenantSpecificOptions.ConfigurationManager.GetConfigurationAsync(notification.Request.CallCancelled);
             notification.AuthenticationTicket.Identity.AddClaim(new Claim("issEndpoint", tenantSpecificConfig.AuthorizationEndpoint, ClaimValueTypes.String, "WebApp-Distributed-SignOut-DotNet"));
 
@@ -160,7 +167,7 @@ namespace WebAppDistributedSignOutDotNet.App_Start
                 ticket.Properties.Dictionary.TryGetValue(OpenIdConnectAuthenticationDefaults.AuthenticationType + "SingleSignOut", out cookieStateValue);
 
             // If the failed authentication was a result of a request by the SingleSignOut javascript
-            if (cookieStateValue != null && cookieStateValue.Contains(notification.ProtocolMessage.State) && notification.Exception.Message == "login_required");
+            if (cookieStateValue != null && cookieStateValue.Contains(notification.ProtocolMessage.State) && notification.Exception.Message == "login_required")
             {
                 // Clear the SingleSignOut cookie, and clear the OIDC session state so 
                 //that we don't see any further "Session Changed" messages from the iframe.
