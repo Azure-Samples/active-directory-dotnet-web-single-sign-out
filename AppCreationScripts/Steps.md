@@ -7,21 +7,29 @@ client: .NET 4.5 Web App (MVC)
 service: ASP.NET Web API
 endpoint: AAD V1
 ---
-
 # Performing single sign out of all web apps using Azure AD
 
-This sample shows how to build an MVC web application that uses Azure AD for sign-in using the OpenID Connect protocol and provides Single Sign Out across web apps.
+![Build badge](https://identitydivision.visualstudio.com/_apis/public/build/definitions/a7934fdd-dcde-4492-a406-7fad6ac00e17/<BuildNumber>/badge)
 
-For more information about how the OpenID Connect protocol works in this scenario, see the [OpenID Connect Session Management Specfication](http://openid.net/specs/openid-connect-session-1_0.html).
+## About this sample
 
-## About The Sample
-If you would like to get started immediately, skip this section and jump to *How To Run The Sample*. 
+### Overview
 
-This MVC 5 web application allows the user to sign in to the application with an AAD account.  Once signed in, if the user signs out of another application that has been authenticated using the same AAD tenant, this application will automatically sign the user out and display a message notifying the user.  Similarly, when the user signs out of this application, they will be signed out of any other applications that use the same AAD tenant and that have implemented Single Sign Out.
+This sample demonstrates a .NET 4.5 Web App (MVC) application calling a ASP.NET Web API that is secured using Azure Active Directory.
 
-This sample will demonstrate the Single Sign Out capability by using the [Azure Management Portal](https://manage.windowsazure.com) as a second application that uses AAD for authentication.
+1. The .Net TodoListClient .NET 4.5 Web App (MVC) application uses the Active Directory Authentication Library (ADAL) to obtain a JWT access token from Azure Active Directory (Azure AD):
+2. The access token is used as a bearer token to authenticate the user when calling the ASP.NET Web API.
 
-## How To Run The Sample
+![Overview](./ReadmeFiles/topology.png)
+
+### Scenario
+
+> Describe the scenario
+> Insert a screen copy of the client
+
+## How to run this sample
+
+To run this sample, you'll need:
 
 - [Visual Studio 2017](https://aka.ms/vsdownload)
 - An Internet connection
@@ -32,9 +40,11 @@ This sample will demonstrate the Single Sign Out capability by using the [Azure 
 
 From your shell or command line:
 
-`git clone https://github.com/Azure-Samples/active-directory-dotnet-web-single-sign-out.git`
+`git clone `
 
 > Given that the name of the sample is pretty long, and so are the name of the referenced NuGet pacakges, you might want to clone it in a folder close to the root of your hard drive, to avoid file size limitations on Windows.
+
+### Step 2:  Register the sample with your Azure Active Directory tenant
 
 There are one projects in this sample. Each needs to be separately registered in your Azure AD tenant. To register these projects, you can:
 
@@ -91,40 +101,46 @@ Open the solution in Visual Studio to configure the projects
 1. Find the app key `ida:AppKey` and replace the existing value with the key you saved during the creation of the `WebApp-DistributedSignOut-DotNet` app, in the Azure portal.
 1. Find the app key `ida:PostLogoutRedirectUri` and replace the existing value with the base address of the WebApp-DistributedSignOut-DotNet project (by default `https://localhost:44308/`).
 
-### Step 5:  Run the sample
+### Step 4: Run the sample
 
-Clean the solution, rebuild the solution, and run it.  NOTE: Be sure not to run the sample in Internet Explorer, or you will get unexpected behavior.  Sign into the application by clicking one of the tabs, such as "About."  Be sure to sign in with a user that can also sign in to the Azure Management Portal.  Once signed in, sign in to the [Azure Management Portal](https://manage.windowsazure.com) as well.  Try signing out of either application; you will be signed out of the other in a matter of seconds.
+Clean the solution, rebuild the solution, and run it.  You might want to go into the solution properties and set both projects as startup projects, with the service project starting first.
 
+> Explain how to Explore the sample.
 
-## Code Walk-Through
+## About the code
 
-For the most part, you can simply cut and paste the code from this sample into your OWIN application in order to provide Single Sign Out functionality.  But for a deeper understanding of the code and the OpenID Connect Session Managment protocol, take a look at the following five files:
+> Describe:
+> - where the code uses auth libraries, or calls the graph
+> - specific aspects (cache)
 
-#### _Layout.cshtml
+## How to deploy this sample to Azure
 
-In `_Layout.cshtml`, you simply need to render the _SingleSignOut.cshtml partial view, so that the Single Sign Out related javascript is loaded into every page in the application.
+This project has one WebApp / Web API projects. To deploy them to Azure Web Sites, you'll need, for each one, to:
 
-#### _SingleSignOut.cshtml
+- create an Azure Web Site
+- publish the Web App / Web APIs to the web site, and
+- update its client(s) to call the web site instead of IIS Express.
 
-This partial view is where the majority of the action takes place.  In order to know when to perform Single Sign Out, the application needs a way to check the status of the user's session with Azure AD.  This could be achieved by polling AAD periodically, but would incur more network cost than is necessary.  Instead, the application will periodically check the value of a cookie that is set by AAD on login, as directed by the OpenID Connect Session Management specfication.  Only if the value of the cookie has changed will the application then submit a request to AAD to check the status of the user's session with AAD.  AAD provides a "CheckSessionIframe" to peform this check for you that is used in this sample.
+### Create and publish the `WebApp-DistributedSignOut-DotNet` to an Azure Web Site
 
-When a page in the application loads, the javascript loads the CheckSessionIframe in a hidden iFrame.  On a periodic basis, it triggers the CheckSessionIFrame to check the AAD cookie and notify the application of any changes.  If a change in the AAD session has been detected, the iFrame is pointed to AAD's authorize endpoint, submitting an authorization request to AAD without requring user interaction (since the iFrame is hidden, of course). The result of this authorization request will be processed by the OWIN OpenIDConnect Middleware, described below in `Startup.Auth.cs`.
+1. Sign in to the [Azure portal](https://portal.azure.com).
+2. Click **Create a resource** in the top left-hand corner, select **Web + Mobile** --> **Web App**, select the hosting plan and region, and give your web site a name, for example, `WebApp-DistributedSignOut-DotNet-contoso.azurewebsites.net`.  Click Create Web Site.
+3. Once the web site is created, click on it to manage it.  For this set of steps, download the publish profile by clicking **Get publish profile** and save it.  Other deployment mechanisms, such as from source control, can also be used.
+4. Switch to Visual Studio and go to the WebApp-DistributedSignOut-DotNet project.  Right click on the project in the Solution Explorer and select **Publish**.  Click **Import Profile** on the bottom bar, and import the publish profile that you downloaded earlier.
+5. Click on **Settings** and in the `Connection tab`, update the Destination URL so that it is https, for example [https://WebApp-DistributedSignOut-DotNet-contoso.azurewebsites.net](https://WebApp-DistributedSignOut-DotNet-contoso.azurewebsites.net). Click Next.
+6. On the Settings tab, make sure `Enable Organizational Authentication` is NOT selected.  Click **Save**. Click on **Publish** on the main screen.
+7. Visual Studio will publish the project and automatically open a browser to the URL of the project.  If you see the default web page of the project, the publication was successful.
 
-#### AccountController.cs
+### Update the Active Directory tenant application registration for `WebApp-DistributedSignOut-DotNet`
 
-In `AccountController.cs`, there are two actions to note.  The `SessionChanged` action is a shortcut that is used to construct the authorization request that is submitted to AAD.  The javascript submits an ajax request to this action, which subsequently issues an OpenID Connect challenge.  This challenge triggers OWIN to construct an authorization request and submit it to AAD.  But instead of allowing OWIN to submit the authorization request, the request is intercepted in `Startup.Auth.cs`'s `RedirectToIdentityProvider` notification and is returned to the originating javascript via `SessionChanged` as the result of the ajax request.  In this way, the javascript does not have to construct an authorization request on its own.
+1. Navigate to the [Azure portal](https://portal.azure.com).
+1. On the top bar, click on your account and under the **Directory** list, choose the Active Directory tenant containing the `WebApp-DistributedSignOut-DotNet` application.
+1. On the applications tab, select the `WebApp-DistributedSignOut-DotNet` application.
+1. In the **Settings** | page for your application, update the Logout URL fields with the address of your service, for example [https://WebApp-DistributedSignOut-DotNet-contoso.azurewebsites.net](https://WebApp-DistributedSignOut-DotNet-contoso.azurewebsites.net)
+1. From the Settings -> Reply URLs menu, update the Sign-On URL, and Reply URL fields to the address of your service, for example [https://WebApp-DistributedSignOut-DotNet-contoso.azurewebsites.net](https://WebApp-DistributedSignOut-DotNet-contoso.azurewebsites.net). Save the configuration.
 
-The other action to note is `SingleSignOut`, which actually signs the user out of the application and displays a message telling the user that a Single Sign Out has occurred.
-
-#### SingleSignOut.cshtml
-
-Presents the Single Sign Out occurred message to the user.
-
-#### Startup.Auth.cs
-
-In `Startup.Auth.cs`, two `OpenIDConnectAuthenticationNotifications` callbacks are used to process the authorization request result from AAD.  If the request fails, it can be interpreted as the user needing to reauthenticate with AAD (and that the user should be signed out of the application).  OWIN triggers the `AuthenticationFailed` callback, which signs the user out using the `SingleSignOut` action.
-
-If the authorization request succeeds, there are two possibilities.  First, that the user is still authenticated with AAD and no Single Sign Out is necessary.  Second, that the user is authenticated with AAD but as a different user than before.  In this case, a Single Sign Out is necessary.  In either case, OWIN triggers the `AuthorizationCodeRecieved` callback, which handles each case individually.
+> NOTE: Remember, the To Do list is stored in memory in this TodoListService sample. Azure Web Sites will spin down your web site if it is inactive, and your To Do list will get emptied.
+Also, if you increase the instance count of the web site, requests will be distributed among the instances. To Do will, therefore, not be the same on each instance.
 
 ## Community Help and Support
 
@@ -142,3 +158,14 @@ If you'd like to contribute to this sample, see [CONTRIBUTING.MD](/CONTRIBUTING.
 
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information, see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
+## More information
+
+For more information, see ADAL.NET's conceptual documentation:
+
+> Provide links to the flows from the conceptual documentation
+> for instance:
+- [Recommended pattern to acquire a token](https://github.com/AzureAD/azure-activedirectory-library-for-dotnet/wiki/AcquireTokenSilentAsync-using-a-cached-token#recommended-pattern-to-acquire-a-token)
+- [Acquiring tokens interactively in public client applications](https://github.com/AzureAD/azure-activedirectory-library-for-dotnet/wiki/Acquiring-tokens-interactively---Public-client-application-flows)
+- [Customizing Token cache serialization](https://github.com/AzureAD/azure-activedirectory-library-for-dotnet/wiki/Token-cache-serialization)
+
+For more information about how OAuth 2.0 protocols work in this scenario and other scenarios, see [Authentication Scenarios for Azure AD](http://go.microsoft.com/fwlink/?LinkId=394414).
