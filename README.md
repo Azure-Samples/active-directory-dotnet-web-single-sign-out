@@ -87,6 +87,7 @@ Open the solution in Visual Studio to configure the projects
 #### Configure the service project
 
 1. Open the `WebApp-DistributedSignOut-DotNet\Web.Config` file
+1. Find the app key `ida:Tenant` and replace the existing value with your Azure AD tenant name.
 1. Find the app key `ida:ClientId` and replace the existing value with the application ID (clientId) of the `WebApp-DistributedSignOut-DotNet` application copied from the Azure portal.
 1. Find the app key `ida:AppKey` and replace the existing value with the key you saved during the creation of the `WebApp-DistributedSignOut-DotNet` app, in the Azure portal.
 1. Find the app key `ida:PostLogoutRedirectUri` and replace the existing value with the base address of the WebApp-DistributedSignOut-DotNet project (by default `https://localhost:44308/`).
@@ -94,7 +95,6 @@ Open the solution in Visual Studio to configure the projects
 ### Step 5:  Run the sample
 
 Clean the solution, rebuild the solution, and run it.  NOTE: Be sure not to run the sample in Internet Explorer, or you will get unexpected behavior.  Sign into the application by clicking one of the tabs, such as "About."  Be sure to sign in with a user that can also sign in to the Azure Management Portal.  Once signed in, sign in to the [Azure Management Portal](https://manage.windowsazure.com) as well.  Try signing out of either application; you will be signed out of the other in a matter of seconds.
-
 
 ## Code Walk-Through
 
@@ -142,3 +142,9 @@ If you'd like to contribute to this sample, see [CONTRIBUTING.MD](/CONTRIBUTING.
 
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information, see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
+## More information
+
+For more information, check out the following links
+
+- [Send a sign-out request](https://docs.microsoft.com/en-us/azure/active-directory/develop/v1-protocols-openid-connect-code#send-a-sign-out-request)
+- [Single Sign-Out SAML Protocol](https://docs.microsoft.com/en-us/azure/active-directory/develop/single-sign-out-saml-protocol)
