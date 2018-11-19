@@ -12,6 +12,8 @@ endpoint: AAD V1
 
 This sample shows how to build an MVC web application that uses Azure AD for sign-in using the OpenID Connect protocol and provides Single Sign Out across web apps.
 
+- An Azure AD Office Hours session covered Single sign-out for applications registred with azure AD. Watch the video [Single sign-on best practices for Azure Active Directory and Microsoft Accounts](https://www.youtube.com/watch?v=9q9N3iUWwGk)
+
 For more information about how the OpenID Connect protocol works in this scenario, see the [OpenID Connect Session Management Specfication](http://openid.net/specs/openid-connect-session-1_0.html).
 
 ## About The Sample
