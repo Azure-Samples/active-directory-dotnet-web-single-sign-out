@@ -10,6 +10,12 @@ endpoint: AAD V1
 
 # Performing single sign out of all web apps using Azure AD
 
+> You might also be interested in this sample: https://github.com/azure-samples/ms-identity-aspnetcore-webapp-tutorial/tree/master/1-WebApp-OIDC/1-6-SignOut
+>
+> This newer sample takes advantage of the Microsoft identity platform (formerly Azure AD v2.0).
+>
+> While still in public preview, every component is supported in production environments.
+
 This sample shows how to build an MVC web application that uses Azure AD for sign-in using the OpenID Connect protocol and provides Single Sign Out across web apps.
 
 - An Azure AD Office Hours session covered Single sign-out for applications registred with azure AD. Watch the video [Single sign-on best practices for Azure Active Directory and Microsoft Accounts](https://www.youtube.com/watch?v=9q9N3iUWwGk)
