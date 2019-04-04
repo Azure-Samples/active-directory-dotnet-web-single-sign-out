@@ -10,7 +10,7 @@ endpoint: AAD V1
 
 # Performing single sign out of all web apps using Azure AD
 
-> You might also be interested in this sample: https://github.com/azure-samples/ms-identity-aspnetcore-webapp-tutorial/
+> You might also be interested in this sample: https://github.com/azure-samples/ms-identity-aspnetcore-webapp-tutorial/tree/master/1-WebApp-OIDC/1-6-SignOut
 >
 > This newer sample takes advantage of the Microsoft identity platform (formerly Azure AD v2.0).
 >
