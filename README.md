@@ -1,11 +1,10 @@
 ---
-services: active-directory
-platforms: dotnet
-author: jmprieur
-level: 400
-client: .NET 4.5 Web App (MVC)
-service: ASP.NET Web API
-endpoint: AAD V1
+languages:
+- csharp
+products:
+- azure
+- azure-active-directory
+topic: sample
 ---
 
 # Performing single sign out of all web apps using Azure AD
