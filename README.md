@@ -4,7 +4,7 @@ languages:
 products:
 - azure
 - azure-active-directory
-topic: sample
+page_type: sample
 ---
 
 # Performing single sign out of all web apps using Azure AD
