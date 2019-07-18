@@ -2,9 +2,11 @@
 languages:
 - csharp
 products:
+- dotnet
 - azure
 - azure-active-directory
 page_type: sample
+description: "Build an MVC web application that uses Azure AD for sign-in using OpenID Connect and provides Single Sign Out across web apps."
 ---
 
 # Performing single sign out of all web apps using Azure AD
